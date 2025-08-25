@@ -1,0 +1,31 @@
+version: "3.9"
+
+services:
+  app:
+    build: .
+    container_name: spring-app
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/renting
+      SPRING_DATASOURCE_USERNAME: renting_user
+      SPRING_DATASOURCE_PASSWORD: renting_pass
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "true"
+
+  db:
+    image: postgres:15
+    container_name: renting-db
+    environment:
+      POSTGRES_DB: renting
+      POSTGRES_USER: renting_user
+      POSTGRES_PASSWORD: renting_pass
+    ports:
+      - "15432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
