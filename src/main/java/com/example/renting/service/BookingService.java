@@ -1,8 +1,8 @@
 package com.example.renting.service;
 
-import com.example.renting.dto.BookingDtos;
+import com.example.renting.dto.BookingDtos.*;
 import com.example.renting.model.*;
-import com.example.renting.repo.BookingRepository;
+import com.example.renting.repo.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -10,39 +10,54 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Service
+@Transactional
 public class BookingService {
     private final BookingRepository bookingRepository;
-    private final ListingService listingService;
+    private final PropertyRepository propertyRepository;
 
-    public BookingService(BookingRepository bookingRepository, ListingService listingService) {
+    public BookingService(BookingRepository bookingRepository, PropertyRepository propertyRepository) {
         this.bookingRepository = bookingRepository;
-        this.listingService = listingService;
+        this.propertyRepository = propertyRepository;
     }
 
-    @Transactional
-    public Booking createBooking(User tenant, BookingDtos.CreateBookingRequest req) {
-        Listing listing = listingService.get(req.listingId);
-        // naive availability check: ensure within available window and no completed bookings overlapping
-        if (req.startDate.isBefore(listing.getAvailableFrom()) || req.endDate.isAfter(listing.getAvailableTo())) {
-            throw new IllegalArgumentException("Dates out of available range");
+    public Booking createBooking(User tenant, CreateBookingRequest req) {
+        if (req.endDate.isBefore(req.startDate) || req.endDate.equals(req.startDate)) {
+            throw new IllegalArgumentException("endDate must be after startDate");
         }
+        Property prop = propertyRepository.findById(req.propertyId).orElseThrow();
+
+        boolean overlaps = bookingRepository.hasOverlappingBookings(prop.getId(), req.startDate, req.endDate);
+        if (overlaps) {
+            throw new IllegalStateException("Selected dates are not available");
+        }
+
+        long nights = ChronoUnit.DAYS.between(req.startDate, req.endDate);
+        double total = nights * prop.getPrice();
+
         Booking b = new Booking();
-        b.setListing(listing);
+        b.setProperty(prop);
         b.setTenant(tenant);
         b.setStartDate(req.startDate);
         b.setEndDate(req.endDate);
-        long nights = ChronoUnit.DAYS.between(req.startDate, req.endDate);
-        b.setTotalPrice(nights * listing.getPricePerNight());
+        b.setTotalPrice(total);
+        b.setStatus(BookingStatus.CREATED);
         return bookingRepository.save(b);
     }
 
-    @Transactional
-    public Booking completeOrCancel(BookingDtos.CompleteBookingRequest req) {
+    public Booking changeStatus(UpdateBookingStatusRequest req) {
         Booking b = bookingRepository.findById(req.bookingId).orElseThrow();
-        b.setStatus(req.cancelled ? BookingStatus.CANCELLED : BookingStatus.COMPLETED);
+        if (b.getStatus() == BookingStatus.CANCELLED) {
+            return b; // уже отменено
+        }
+        b.setStatus(req.status);
         return bookingRepository.save(b);
     }
 
-    public List<Booking> byTenant(Long tenantId) { return bookingRepository.findByTenantId(tenantId); }
-    public List<Booking> byListing(Long listingId) { return bookingRepository.findByListingId(listingId); }
+    public List<Booking> byTenant(Long tenantId) {
+        return bookingRepository.findByTenantId(tenantId);
+    }
+
+    public List<Booking> byProperty(Long propertyId) {
+        return bookingRepository.findByPropertyId(propertyId);
+    }
 }

@@ -8,11 +8,31 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
+
+
+import com.example.renting.model.*;
+import org.springframework.data.jpa.repository.*;
+import org.springframework.data.repository.query.Param;
+
+
+import java.time.LocalDate;
+import java.util.List;
+
+
 public interface BookingRepository extends JpaRepository<Booking, Long> {
-    List<Booking> findByListingAndStatus(Listing listing, BookingStatus status);
+    List<Booking> findByProperty(Property property);
     List<Booking> findByTenant(User tenant);
-    List<Booking> findByListing(Listing listing);
-    List<Booking> findByListingId(Long listingId);
+    List<Booking> findByPropertyId(Long propertyId);
     List<Booking> findByTenantId(Long tenantId);
-    List<Booking> findByListingIdAndStatus(Long listingId, BookingStatus status);
+    List<Booking> findByPropertyAndStatus(Property property, BookingStatus status);
+    List<Booking> findByPropertyIdAndStatus(Long propertyId, BookingStatus status);
+
+
+    // Проверка перекрытия периодов: [start, end) против существующих (всё, кроме CANCELLED)
+    @Query("SELECT CASE WHEN COUNT(b) > 0 THEN TRUE ELSE FALSE END FROM Booking b " +
+            "WHERE b.property.id = :propertyId AND b.status <> com.example.renting.model.BookingStatus.CANCELLED " +
+            "AND b.startDate < :endDate AND b.endDate > :startDate")
+    boolean hasOverlappingBookings(@Param("propertyId") Long propertyId,
+                                   @Param("startDate") LocalDate startDate,
+                                   @Param("endDate") LocalDate endDate);
 }

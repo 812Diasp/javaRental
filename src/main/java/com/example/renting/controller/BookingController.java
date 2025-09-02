@@ -13,6 +13,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/bookings")
+@CrossOrigin(origins = "*")
 public class BookingController {
 
     private final BookingService bookingService;
@@ -24,19 +25,43 @@ public class BookingController {
     }
 
     @PostMapping
-    public ResponseEntity<Booking> create(Authentication auth, @RequestBody BookingDtos.CreateBookingRequest req) {
-        User tenant = userRepository.findByNickname(auth.getName()).orElseThrow();
+    public ResponseEntity<Booking> create(Authentication auth,
+                                          @RequestHeader(value = "X-User-Id", required = false) Long userId,
+                                          @RequestBody BookingDtos.CreateBookingRequest req) {
+        User tenant;
+        if (auth != null) {
+            tenant = userRepository.findByNickname(auth.getName()).orElseThrow();
+        } else if (userId != null) {
+            tenant = userRepository.findById(userId).orElseThrow();
+        } else {
+            return ResponseEntity.status(401).build();
+        }
         return ResponseEntity.ok(bookingService.createBooking(tenant, req));
     }
 
-    @PostMapping("/complete")
-    public ResponseEntity<Booking> complete(@RequestBody BookingDtos.CompleteBookingRequest req) {
-        return ResponseEntity.ok(bookingService.completeOrCancel(req));
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<Booking> changeStatus(@PathVariable Long id,
+                                                @RequestBody BookingDtos.UpdateBookingStatusRequest body) {
+        body.bookingId = id;
+        return ResponseEntity.ok(bookingService.changeStatus(body));
+    }
+
+    @PostMapping("/complete") // для совместимости со старым API
+    public ResponseEntity<Booking> complete(@RequestBody BookingDtos.UpdateBookingStatusRequest req) {
+        return ResponseEntity.ok(bookingService.changeStatus(req));
     }
 
     @GetMapping("/me")
-    public ResponseEntity<List<Booking>> myBookings(Authentication auth) {
-        User tenant = userRepository.findByNickname(auth.getName()).orElseThrow();
-        return ResponseEntity.ok(bookingService.byTenant(tenant.getId()));
+    public ResponseEntity<List<Booking>> myBookings(Authentication auth,
+                                                    @RequestHeader(value = "X-User-Id", required = false) Long userId) {
+        Long tenantId;
+        if (auth != null) {
+            tenantId = userRepository.findByNickname(auth.getName()).orElseThrow().getId();
+        } else if (userId != null) {
+            tenantId = userId;
+        } else {
+            return ResponseEntity.status(401).build();
+        }
+        return ResponseEntity.ok(bookingService.byTenant(tenantId));
     }
 }
