@@ -45,17 +45,23 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     .findFirst().orElse(null);
         }
 
+        // В JwtAuthFilter.doFilterInternal
+
         if (token != null) {
             try {
                 Jws<Claims> claims = jwtService.parse(token);
                 String subject = claims.getBody().getSubject();
+                System.out.println("✅ JWT parsed, subject: " + subject); // 🔍 Лог
+
                 UserDetails ud = userService.loadUserByUsername(subject);
                 UsernamePasswordAuthenticationToken auth =
                         new UsernamePasswordAuthenticationToken(ud, null, ud.getAuthorities());
                 auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(auth);
+
+                System.out.println("✅ Authentication установлен: " + auth); // 🔍 Лог
             } catch (Exception e) {
-                // ignore, will proceed unauthenticated
+                System.out.println("❌ JWT parsing failed: " + e.getMessage()); // 🔍 Лог
             }
         }
         filterChain.doFilter(request, response);
