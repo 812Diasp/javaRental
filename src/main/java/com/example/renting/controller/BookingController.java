@@ -36,6 +36,8 @@ public class BookingController {
     @PostMapping
     public ResponseEntity<Booking> create(Authentication auth, @RequestBody BookingDtos.CreateBookingRequest req) {
         if (auth == null || !auth.isAuthenticated()) {
+            System.out.println(auth);
+            System.out.println("не авторизовано");
             return status(401).build();
         }
 
