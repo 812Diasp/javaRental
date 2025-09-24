@@ -13,6 +13,9 @@ public class Listing {
     @ManyToOne(optional = false)
     private User owner; // RENTMAN
 
+    @ManyToOne(optional = false)
+    private Property property; // связь с Property
+
     @NotBlank
     private String city;
 
@@ -32,6 +35,8 @@ public class Listing {
 
     private Integer ratingsCount = 0;
 
+    private Boolean active = true; // добавляем поле active
+
     public Listing() {}
 
     // Getters/Setters
@@ -40,6 +45,9 @@ public class Listing {
 
     public User getOwner() { return owner; }
     public void setOwner(User owner) { this.owner = owner; }
+
+    public Property getProperty() { return property; }
+    public void setProperty(Property property) { this.property = property; }
 
     public String getCity() { return city; }
     public void setCity(String city) { this.city = city; }
@@ -61,4 +69,7 @@ public class Listing {
 
     public Integer getRatingsCount() { return ratingsCount; }
     public void setRatingsCount(Integer ratingsCount) { this.ratingsCount = ratingsCount; }
+
+    public Boolean getActive() { return active; }
+    public void setActive(Boolean active) { this.active = active; }
 }

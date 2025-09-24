@@ -1,27 +1,22 @@
-// src/main/java/com/example/renting/controller/BookingController.java
-
 package com.example.renting.controller;
 
-import com.example.renting.dto.BookingDtos;
 import com.example.renting.model.Booking;
+import com.example.renting.model.BookingStatus;
 import com.example.renting.model.User;
 import com.example.renting.repo.UserRepository;
 import com.example.renting.service.BookingService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
-
-import static org.springframework.http.ResponseEntity.ok;
-import static org.springframework.http.ResponseEntity.status;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/bookings")
 @CrossOrigin(origins = "*")
 public class BookingController {
-
     private final BookingService bookingService;
     private final UserRepository userRepository;
 
@@ -30,63 +25,46 @@ public class BookingController {
         this.userRepository = userRepository;
     }
 
-    /**
-     * Создаёт бронирование на основе аутентифицированного пользователя (JWT)
-     */
     @PostMapping
-    public ResponseEntity<Booking> create(Authentication auth, @RequestBody BookingDtos.CreateBookingRequest req) {
-        if (auth == null || !auth.isAuthenticated()) {
-            System.out.println(auth);
-            System.out.println("не авторизовано");
-            return status(401).build();
-        }
+    public ResponseEntity<Booking> createBooking(
+            Authentication authentication,
+            @RequestBody Map<String, Object> request) {
+        
+        String username = authentication.getName();
+        User user = userRepository.findByNickname(username)
+                .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
 
-        String nickname = auth.getName();
-        User tenant = userRepository.findByNickname(nickname)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + nickname));
+        Long propertyId = Long.valueOf(request.get("propertyId").toString());
+        LocalDate startDate = LocalDate.parse(request.get("startDate").toString());
+        LocalDate endDate = LocalDate.parse(request.get("endDate").toString());
 
-        return ok(bookingService.createBooking(tenant, req));
+        Booking booking = bookingService.createBooking(user, propertyId, startDate, endDate);
+        return ResponseEntity.ok(booking);
     }
 
-    /**
-     * Меняет статус бронирования (например, отмена)
-     */
     @PatchMapping("/{id}/status")
-    public ResponseEntity<Booking> changeStatus(
+    public ResponseEntity<Booking> updateBookingStatus(
+            Authentication authentication,
             @PathVariable Long id,
-            @RequestBody BookingDtos.UpdateBookingStatusRequest body,
-            Authentication auth) {
+            @RequestBody Map<String, String> request) {
+        
+        String username = authentication.getName();
+        User user = userRepository.findByNickname(username)
+                .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
 
-        if (auth == null || !auth.isAuthenticated()) {
-            return status(401).build();
-        }
-
-        body.bookingId = id;
-        return ok(bookingService.changeStatus(body));
+        BookingStatus status = BookingStatus.valueOf(request.get("status"));
+        Booking booking = bookingService.changeStatus(id, status, user.getId());
+        
+        return ResponseEntity.ok(booking);
     }
 
-    /**
-     * Получить все бронирования текущего пользователя
-     */
-    @GetMapping("/me")
-    public ResponseEntity<List<Booking>> myBookings(Authentication auth) {
-        if (auth == null || !auth.isAuthenticated()) {
-            return status(401).build();
-        }
+    @GetMapping("/my")
+    public ResponseEntity<List<Booking>> getUserBookings(Authentication authentication) {
+        String username = authentication.getName();
+        User user = userRepository.findByNickname(username)
+                .orElseThrow(() -> new IllegalArgumentException("Пользователь не найден"));
 
-        String nickname = auth.getName();
-        User user = userRepository.findByNickname(nickname)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + nickname));
-
-        return ok(bookingService.byTenant(user.getId()));
-    }
-
-    // /complete можно оставить или удалить — зависит от фронтенда
-    @PostMapping("/complete")
-    public ResponseEntity<Booking> complete(@RequestBody BookingDtos.UpdateBookingStatusRequest req, Authentication auth) {
-        if (auth == null || !auth.isAuthenticated()) {
-            return status(401).build();
-        }
-        return ok(bookingService.changeStatus(req));
+        List<Booking> bookings = bookingService.getUserBookings(user.getId());
+        return ResponseEntity.ok(bookings);
     }
 }
